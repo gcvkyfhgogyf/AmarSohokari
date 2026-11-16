@@ -7,19 +7,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: unzip -o AmarSohokari.zip -d proj
+      - name: Find project
+        run: |
+          ls -la
+          ZIP=$(find . -maxdepth 2 -iname '*.zip' | head -n 1)
+          if [ -n "$ZIP" ]; then
+            echo "Unzipping: $ZIP"
+            mkdir -p /tmp/proj
+            unzip -o "$ZIP" -d /tmp/proj
+            SRC=/tmp/proj
+          else
+            SRC=.
+          fi
+          S=$(find "$SRC" -name settings.gradle.kts | head -n 1)
+          if [ -z "$S" ]; then echo "settings.gradle.kts not found"; exit 1; fi
+          echo "PROJ=$(dirname "$S")" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-      - name: Accept Android licenses
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-      - run: gradle assembleDebug --no-daemon
-        working-directory: proj
+      - name: Build
+        working-directory: ${{ env.PROJ }}
+        run: gradle assembleDebug --no-daemon --console=plain
       - uses: actions/upload-artifact@v4
         with:
           name: AmarSohokari-apk
-          path: proj/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/app-debug.apk
